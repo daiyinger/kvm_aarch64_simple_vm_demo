@@ -86,7 +86,7 @@ int main(int argc, const char *argv[])
 	// 设置cpu的初始信息，因为host使用qemu模拟的cortex-a57，所以这里要
 	// 将target设置为KVM_ARM_TARGET_CORTEX_A57
 	bzero(&init, sizeof(init));
-	init.target = KVM_ARM_TARGET_CORTEX_A57;
+	init.target = KVM_ARM_TARGET_CORTEX_A53;
 	ret = ioctl(vcpu_fd, KVM_ARM_VCPU_INIT, &init);
 	assert(ret >= 0);
 

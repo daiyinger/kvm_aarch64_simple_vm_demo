@@ -5,16 +5,19 @@ OPT_LEVEL ?= 0
 
 # Other switches the user should not normally need to change:
 ARCH = armv8-a
-DEBUG_FLAGS = -g
+DEBUG_FLAGS = -g -fno-stack-protector
 
 ifeq ($(QUIET),@)
 PROGRESS = @echo Compiling $<...
 endif
 
 VIRT_CC = aarch64-linux-gnu-gcc
-CC = aarch64-elf-gcc
-OBJDUMP = aarch64-elf-objdump
-OBJCOPY= aarch64-elf-objcopy
+#CC = aarch64-elf-gcc
+#OBJDUMP = aarch64-elf-objdump
+#OBJCOPY= aarch64-elf-objcopy
+CC = aarch64-linux-gnu-gcc
+OBJDUMP = aarch64-linux-gnu-objdump
+OBJCOPY = aarch64-linux-gnu-objcopy
 SRC_DIR = guest_src
 VIRT_SRC_DIR= virt_src
 ASM_DIR = asm
