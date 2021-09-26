@@ -33,7 +33,7 @@ int main(int argc, const char *argv[])
 	struct kvm_one_reg reg;
 	struct kvm_vcpu_init init;
 	void *userspace_addr;
-	__u64 guest_entry = ENTRY_POINT;
+	__u64 guest_entry = ENTRY_POINT; //ENTRY_POINT=(RAM_START + ENTRY_OFFSET)
 	__u64 guest_pstate;
 
 	// 打开kvm模块
@@ -66,9 +66,10 @@ int main(int argc, const char *argv[])
 	assert(userspace_addr > 0);
 
 	// 将客户机镜像装载到共享内存中
-	ret = read(guest_fd, userspace_addr + ENTRY_OFFSET, RAM_SIZE);
+	ret = read(guest_fd, userspace_addr + ENTRY_OFFSET, RAM_SIZE); //ENTRY_OFFSET=0x1000 
 	assert(ret > 0);
 
+	printf("kvm slots is %d\n", ioctl(vm_fd, KVM_CHECK_EXTENSION, KVM_CAP_NR_MEMSLOTS));
 	// 将上面分配的共享内存(HVA)到客户机的0x100000物理地址(GPA)的映射注册到KVM中
 	// 
 	// 当客户机使用GPA(IPA)访问这段内存时，会发生缺页异常，陷入EL2
@@ -77,7 +78,7 @@ int main(int argc, const char *argv[])
 	// VTTBR_EL2指向的stage2页表中，这个跟intel架构下的EPT技术类似
 	mem.slot = 0;
 	mem.flags = 0;
-	mem.guest_phys_addr = (__u64)RAM_START;
+	mem.guest_phys_addr = (__u64)RAM_START; //0x100000
 	mem.userspace_addr = (__u64)userspace_addr;
 	mem.memory_size = (__u64)RAM_SIZE;
 	ret = ioctl(vm_fd, KVM_SET_USER_MEMORY_REGION, &mem);
@@ -90,7 +91,7 @@ int main(int argc, const char *argv[])
 	ret = ioctl(vcpu_fd, KVM_ARM_VCPU_INIT, &init);
 	assert(ret >= 0);
 
-	// 设置从host进入虚拟机后cpu第一条指令的地址，也就是上面的0x100000
+	// 设置从host进入虚拟机后cpu第一条指令的地址，也就是上面的RAM_START(0x100000)+ENTRY_OFFSET(0x1000)
 	reg.id = AARCH64_CORE_REG(regs.pc);
 	reg.addr = (__u64)&guest_entry;
 	ret = ioctl(vcpu_fd, KVM_SET_ONE_REG, &reg);
