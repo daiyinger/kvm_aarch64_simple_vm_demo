@@ -27,6 +27,7 @@ int main(int argc, const char *argv[])
 	int guest_fd;
 	int ret;
 	int mmap_size;
+	int dev_mem_fd;
 
 	struct kvm_userspace_memory_region mem;
 	struct kvm_run *kvm_run;
@@ -83,6 +84,24 @@ int main(int argc, const char *argv[])
 	mem.memory_size = (__u64)RAM_SIZE;
 	ret = ioctl(vm_fd, KVM_SET_USER_MEMORY_REGION, &mem);
 	assert(ret >= 0);
+
+	dev_mem_fd = open("/dev/mem", O_RDWR | O_SYNC | O_CLOEXEC);
+	assert(dev_mem_fd > 0);
+	// 分配一段共享内存，下面会将这段共享内存映射到客户机中，作为客户机看到的物理地址 0x9000000为串口寄存器基地址
+	userspace_addr = mmap(0, 4096, PROT_READ|PROT_WRITE,
+		MAP_SHARED, dev_mem_fd, 0x9000000);
+	assert(userspace_addr > 0);
+	printf("UART mmap userspace_addr:%p\n", userspace_addr);
+	//*((unsigned int *)userspace_addr) = 'Y';
+	//*((unsigned int *)userspace_addr) = '\n';
+	mem.slot = 1;
+	mem.flags = 0;
+	mem.guest_phys_addr = (__u64)0x9000000; //0x100000
+	mem.userspace_addr = (__u64)userspace_addr;
+	mem.memory_size = (__u64)4096;
+	ret = ioctl(vm_fd, KVM_SET_USER_MEMORY_REGION, &mem);
+	assert(ret >= 0);
+
 
 	// 设置cpu的初始信息，因为host使用qemu模拟的cortex-a57，所以这里要
 	// 将target设置为KVM_ARM_TARGET_CORTEX_A57
