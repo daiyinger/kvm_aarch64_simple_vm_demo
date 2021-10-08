@@ -18,6 +18,7 @@
 #define KVM_DEV		"/dev/kvm"
 #define GUEST_BIN	"./guest.bin"
 #define AARCH64_CORE_REG(x)		(KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_CORE | KVM_REG_ARM_CORE_REG(x))
+#define UART_ADDR 0x3F201000//0x7e201000
 
 int main(int argc, const char *argv[])
 {
@@ -87,16 +88,16 @@ int main(int argc, const char *argv[])
 
 	dev_mem_fd = open("/dev/mem", O_RDWR | O_SYNC | O_CLOEXEC);
 	assert(dev_mem_fd > 0);
-	// 分配一段共享内存，下面会将这段共享内存映射到客户机中，作为客户机看到的物理地址 0x9000000为串口寄存器基地址
+	// 分配一段共享内存，下面会将这段共享内存映射到客户机中，作为客户机看到的物理地址 UART_ADDR为串口寄存器基地址
 	userspace_addr = mmap(0, 4096, PROT_READ|PROT_WRITE,
-		MAP_SHARED, dev_mem_fd, 0x9000000);
+		MAP_SHARED, dev_mem_fd, UART_ADDR);
 	assert(userspace_addr > 0);
 	printf("UART mmap userspace_addr:%p\n", userspace_addr);
 	//*((unsigned int *)userspace_addr) = 'Y';
 	//*((unsigned int *)userspace_addr) = '\n';
 	mem.slot = 1;
 	mem.flags = 0;
-	mem.guest_phys_addr = (__u64)0x9000000; //0x100000
+	mem.guest_phys_addr = (__u64)UART_ADDR; //0x100000
 	mem.userspace_addr = (__u64)userspace_addr;
 	mem.memory_size = (__u64)4096;
 	ret = ioctl(vm_fd, KVM_SET_USER_MEMORY_REGION, &mem);

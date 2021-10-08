@@ -10,8 +10,14 @@ uintptr_t read_current_el(void)
 
 	return el>>2;
 }
-char *serial_test_str = "Hello Serial!\n";
-unsigned int *UART_DR = (unsigned int *)0x9000000;
+char *serial_test_str = "Hello Serial! I'm in guest! \r\n";
+unsigned int *UART_DR = (unsigned int *)0x3F201000; //0x7e201000;
+
+void delay(int i)
+{
+	while(i--);
+}
+
 int main(void)
 {
 	int i;
@@ -20,6 +26,7 @@ int main(void)
 	for(i = 0; i < strlen(serial_test_str); i++)
 	{
 		*UART_DR = serial_test_str[i];
+		delay(10000);
 	}
 	return 0;
 }
