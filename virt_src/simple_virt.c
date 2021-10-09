@@ -83,6 +83,7 @@ int main(int argc, const char *argv[])
 	mem.guest_phys_addr = (__u64)RAM_START; //0x100000
 	mem.userspace_addr = (__u64)userspace_addr;
 	mem.memory_size = (__u64)RAM_SIZE;
+	printf("mem.guest_phys_addr:%llx\n", mem.guest_phys_addr);
 	ret = ioctl(vm_fd, KVM_SET_USER_MEMORY_REGION, &mem);
 	assert(ret >= 0);
 
