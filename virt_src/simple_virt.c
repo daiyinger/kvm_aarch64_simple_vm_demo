@@ -90,7 +90,7 @@ int main(int argc, const char *argv[])
 	dev_mem_fd = open("/dev/mem", O_RDWR | O_SYNC | O_CLOEXEC);
 	assert(dev_mem_fd > 0);
 	// 分配一段共享内存，下面会将这段共享内存映射到客户机中，作为客户机看到的物理地址 UART_ADDR为串口寄存器基地址
-	userspace_addr = mmap(0, 4096, PROT_READ|PROT_WRITE,
+	userspace_addr = mmap(0, 4096*4, PROT_READ|PROT_WRITE,
 		MAP_SHARED, dev_mem_fd, UART_ADDR);
 	assert(userspace_addr > 0);
 	printf("UART mmap userspace_addr:%p\n", userspace_addr);
@@ -100,7 +100,7 @@ int main(int argc, const char *argv[])
 	mem.flags = 0;
 	mem.guest_phys_addr = (__u64)UART_ADDR; //0x100000
 	mem.userspace_addr = (__u64)userspace_addr;
-	mem.memory_size = (__u64)4096;
+	mem.memory_size = (__u64)4096*4;
 	ret = ioctl(vm_fd, KVM_SET_USER_MEMORY_REGION, &mem);
 	assert(ret >= 0);
 

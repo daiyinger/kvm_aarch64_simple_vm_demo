@@ -8,14 +8,25 @@
 
 void PUT32 ( unsigned int addr, unsigned int val)
 {
+	if(addr >= 0x3F204000 && addr <= 0x3F204020)
+		printf("==PUT32: %x -> val:%x\n", addr, val);
 	*((unsigned int *)addr) = val;
 }
 unsigned int GET32 ( unsigned int addr)
 {
-	return *((unsigned int *)addr);
+	unsigned int ret = 0;
+	ret = *((unsigned int *)addr);
+	if(addr >= 0x3F204000 && addr <= 0x3F204020)
+		printf("++GET32: %x => ret:%x\n", addr, ret);
+	return ret;
 }
 void dummy ( unsigned int val)
 {}
+
+void delay(int cnt)
+{
+	while(cnt--);
+}
 
 #define GPFSEL0 0x20200000
 #define GPFSEL1 0x20200004
@@ -39,13 +50,38 @@ void dummy ( unsigned int val)
 #define AUX_MU_STAT_REG 0x20215064
 #define AUX_MU_BAUD_REG 0x20215068
 
-#define AUX_SPI0_CS     0x20204000
-#define AUX_SPI0_FIFO   0x20204004
-#define AUX_SPI0_CLK    0x20204008
-#define AUX_SPI0_DLEN   0x2020400C
-#define AUX_SPI0_LTOH   0x20204010
-#define AUX_SPI0_DC     0x20204014
+#define AUX_SPI0_CS     0x3F204000
+#define AUX_SPI0_FIFO   0x3F204004
+#define AUX_SPI0_CLK    0x3F204008
+#define AUX_SPI0_DLEN   0x3F20400C
+#define AUX_SPI0_LTOH   0x3F204010
+#define AUX_SPI0_DC     0x3F204014
 
+/* Bitfields in CS */
+#define BCM2835_SPI_CS_LEN_LONG		0x02000000
+#define BCM2835_SPI_CS_DMA_LEN		0x01000000
+#define BCM2835_SPI_CS_CSPOL2		0x00800000
+#define BCM2835_SPI_CS_CSPOL1		0x00400000
+#define BCM2835_SPI_CS_CSPOL0		0x00200000
+#define BCM2835_SPI_CS_RXF		0x00100000
+#define BCM2835_SPI_CS_RXR		0x00080000
+#define BCM2835_SPI_CS_TXD		0x00040000
+#define BCM2835_SPI_CS_RXD		0x00020000
+#define BCM2835_SPI_CS_DONE		0x00010000
+#define BCM2835_SPI_CS_LEN		0x00002000
+#define BCM2835_SPI_CS_REN		0x00001000
+#define BCM2835_SPI_CS_ADCS		0x00000800
+#define BCM2835_SPI_CS_INTR		0x00000400
+#define BCM2835_SPI_CS_INTD		0x00000200
+#define BCM2835_SPI_CS_DMAEN		0x00000100
+#define BCM2835_SPI_CS_TA		0x00000080
+#define BCM2835_SPI_CS_CSPOL		0x00000040
+#define BCM2835_SPI_CS_CLEAR_RX		0x00000020
+#define BCM2835_SPI_CS_CLEAR_TX		0x00000010
+#define BCM2835_SPI_CS_CPOL		0x00000008
+#define BCM2835_SPI_CS_CPHA		0x00000004
+#define BCM2835_SPI_CS_CS_10		0x00000002
+#define BCM2835_SPI_CS_CS_01		0x00000001
 
 #define SETCONTRAST         0x81
 #define DISPLAYALLONRESUME  0xA4
@@ -207,17 +243,48 @@ void spi_init ( void )
 
 }
 //------------------------------------------------------------------------
+void spi_test (void)
+{
+	int cnt = 0;
+	int i;
+	int rx_len = 0;
+	int tx_len = 0;
+	unsigned int x = 0xa5;
+	for (i = 0; i < 3; i++)
+	{
+		if(!(GET32(AUX_SPI0_CS)&(BCM2835_SPI_CS_TXD))) break; //TXD
+		PUT32(AUX_SPI0_FIFO,x&0xFF);
+		x++;
+		tx_len++;
+	}
+	rx_len = tx_len;
+	for (i = 0; i < 5; i++)
+	{
+		while((rx_len) && (!(GET32(AUX_SPI0_CS)&(BCM2835_SPI_CS_RXD))))
+			delay(200);
+		GET32(AUX_SPI0_FIFO);
+		if(rx_len > 0)
+		{
+			rx_len--;
+		}
+		else
+		{
+			break;
+		}
+	}
+}
+
 void spi_one_byte ( unsigned int x )
 {
-    PUT32(AUX_SPI0_CS,0x000000B0); //TA=1 cs asserted
-    while(1)
-    {
-        if(GET32(AUX_SPI0_CS)&(1<<18)) break; //TXD
-    }
-    PUT32(AUX_SPI0_FIFO,x&0xFF);
-    while(1) if(GET32(AUX_SPI0_CS)&(1<<16)) break;
-    //while(1) if(GET32(AUX_SPI0_CS)&(1<<17)) break; //should I wait for this?
-    PUT32(AUX_SPI0_CS,0x00000000); //cs0 comes back up
+	int cnt = 0;
+	while(1)
+	{
+		if(GET32(AUX_SPI0_CS)&(BCM2835_SPI_CS_TXD)) break; //TXD
+		else if(cnt++ > 10000) break;
+	}
+	PUT32(AUX_SPI0_FIFO,x&0xFF);
+	while(1) if(GET32(AUX_SPI0_CS)&(BCM2835_SPI_CS_TXD)) break;
+    //PUT32(AUX_SPI0_CS,0x00000000); //cs0 comes back up
 }
 //------------------------------------------------------------------------
 void spi_command ( unsigned int cmd )
@@ -313,52 +380,25 @@ int main ( void )
     {
         hexstring(ra);
     }
-    spi_init();
+    //spi_init();
 
+	/*
     PUT32(AUX_SPI0_CS,0x00000000); //cs1 high
     for(ra=0;ra<0x10000;ra++) dummy(ra);
     PUT32(AUX_SPI0_CS,0x00400000); //cs1 low, reset
     for(ra=0;ra<0x10000;ra++) dummy(ra);
     PUT32(AUX_SPI0_CS,0x00000000); //cs1 comes back up
+	*/
 
-
+    PUT32(AUX_SPI0_CS,0x40000);
+	delay(1000);
+	PUT32(AUX_SPI0_CS,0x320);
+	delay(1000);
+	PUT32(AUX_SPI0_CS,0x40083);
+	delay(1000);
     // Display Init sequence for 64x48 OLED module
-    spi_command(DISPLAYOFF);           // 0xAE
-    spi_command(SETDISPLAYCLOCKDIV);   // 0xD5
-    spi_command(0x80);                 // the suggested ratio 0x80
-    spi_command(SETMULTIPLEX);         // 0xA8
-    spi_command(0x2F);
-    spi_command(SETDISPLAYOFFSET);     // 0xD3
-    spi_command(0x0);                  // no offset
-    spi_command(SETSTARTLINE | 0x0);   // line #0
-    spi_command(CHARGEPUMP);           // enable charge pump
-    spi_command(0x14);
-    spi_command(NORMALDISPLAY);            // 0xA6
-    spi_command(DISPLAYALLONRESUME);   // 0xA4
-    spi_command(SEGREMAP | 0x1);
-    spi_command(COMSCANDEC);
-    spi_command(SETCOMPINS);           // 0xDA
-    spi_command(0x12);
-    spi_command(SETCONTRAST);          // 0x81
-    spi_command(0x7F);
-    spi_command(SETPRECHARGE);         // 0xd9
-    spi_command(0xF1);
-    spi_command(SETVCOMDESELECT);          // 0xDB
-    spi_command(0x40);
-    ClearScreen();
-    spi_command(DISPLAYON);                //--turn on oled panel
-    //spi_command(DISPLAYALLON);
-
-    show_text(0,"HELLO");
-    show_text(1,"World!");
-    show_text_hex(2,0x12345678);
-    show_text_hex(3,0xABCDEF00);
-    for(ra=0;ra<=0x10000;ra++) show_text_hex(5,ra);
-
-    //ClearScreen();
-    for(ra=0;ra<6;ra++) hex_screen_history[ra]=0;
-    for(ra=0;ra<0x1000;ra++) hex_screen(ra);
-
+    //spi_command(DISPLAYOFF);           // 0xAE
+	spi_test();
     hexstring(0x12345678);
     return(0);
 }
